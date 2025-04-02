@@ -1,7 +1,18 @@
-public public class DemoViewer {
-  public static void main()String[] args {
+import javax.swing.*;
+import java.awt.*;
+
+public class DemoViewer {
+  public static void main(String[] args) {
+    String FilePath = "";
+    try {
+      FilePath = args[0];
+      System.out.println("Showing files at: "+ FilePath);
+    } catch (Exception e) {
+      System.out.println("Error, please ensure the right amount of arguments \n" + e);
+    }
+
     JFrame frame = new JFrame("OBJ Viewer");
-    frame.setDefualtCloseOperation(JFrame.EXIT_ON_CLOSE);
+    //frame.setDefualtCloseOperation(JFrame.EXIT_ON_CLOSE);
     Container pane = frame.getContentPane();
     pane.setLayout(new BorderLayout());
   
