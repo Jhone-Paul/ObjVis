@@ -1,5 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.io.*;
 import java.util.*;
 import javax.swing.event.*;
@@ -41,6 +42,152 @@ public class DemoViewer {
       frame.setVisible(true);
   }
 }
+
+class RenderPanel extends JPanel {
+  private Model model;
+  private int heading =180;
+  private int pitch =0;
+  private double scale = 1.0;
+
+  public RenderPanel(Model model) {
+    this.model = model;
+
+    addMouseWheelListener(new MouseWheelListener(){
+      public void mouseWheelMoved(MouseWheelEvent e) {
+        scale =e.getPreciseWheelRotation()*0.1;
+        if (scale < 0.1) scale = 0.1;
+        if (scale > 10) scale = 10;
+        repaint();
+      }
+    });
+  }
+
+  public void setModel(Model model){
+    this.model = model;
+    repaint();
+  }
+  public void setHeading(int heading) {
+        this.heading = heading;
+        repaint();
+  }
+    
+  public void setPitch(int pitch) {
+      this.pitch = pitch;
+    repaint();
+  }
+    
+  @Override
+  protected void paintComponent(Graphics g) {
+      super.paintComponent(g);
+        
+      if (model == null) return;
+      
+      Graphics2D g2 = (Graphics2D) g;
+      g2.setColor(Color.BLACK);
+      g2.fillRect(0, 0, getWidth(), getHeight());
+        
+      // Enable anti-aliasing
+      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        
+        // Center of the panel
+      int centerX = getWidth() / 2;
+      int centerY = getHeight() / 2;
+        
+      // Calculate sine and cosine values for the rotations
+      double headingRad = Math.toRadians(heading);
+      double pitchRad = Math.toRadians(pitch);
+      double cosHeading = Math.cos(headingRad);
+      double sinHeading = Math.sin(headingRad);
+      double cosPitch = Math.cos(pitchRad);
+      double sinPitch = Math.sin(pitchRad);
+        
+        // Create z-buffer (for depth sorting)
+      double[][] zBuffer = new double[getWidth()][getHeight()];
+      for (int x = 0; x < getWidth(); x++) {
+          for (int y = 0; y < getHeight(); y++) {
+              zBuffer[x][y] = Double.NEGATIVE_INFINITY;
+            }
+        }
+        
+      BufferedImage img = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2img = img.createGraphics();
+        g2img.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        
+        // Project all triangles
+        for (Triangle triangle : model.triangles) {
+            Vector3D v1 = model.vertices.get(triangle.v1);
+            Vector3D v2 = model.vertices.get(triangle.v2);
+            Vector3D v3 = model.vertices.get(triangle.v3);
+            
+            // Apply rotation and projection to each vertex
+            Point p1 = projectVertex(v1, centerX, centerY, cosHeading, sinHeading, cosPitch, sinPitch);
+            Point p2 = projectVertex(v2, centerX, centerY, cosHeading, sinHeading, cosPitch, sinPitch);
+            Point p3 = projectVertex(v3, centerX, centerY, cosHeading, sinHeading, cosPitch, sinPitch);
+            
+            // Calculate the normal vector of the triangle
+            Vector3D edge1 = v2.subtract(v1);
+            Vector3D edge2 = v3.subtract(v1);
+            Vector3D normal = edge1.cross(edge2).normalize();
+            
+            // Simple lighting calculation
+            Vector3D lightDir = new Vector3D(0, 0, -1); // Light direction
+            double lightIntensity = Math.max(0.1, normal.dot(lightDir));
+            int shade = (int)(lightIntensity * 200);
+            
+            // Create polygon for the triangle
+            Polygon poly = new Polygon();
+            poly.addPoint(p1.x, p1.y);
+            poly.addPoint(p2.x, p2.y);
+            poly.addPoint(p3.x, p3.y);
+            
+            // Compute average Z for depth sorting
+            double avgZ = (v1.z + v2.z + v3.z) / 3.0;
+            
+            // Draw the triangle with basic lighting
+            g2img.setColor(new Color(shade, shade, shade));
+            g2img.fillPolygon(poly);
+            g2img.setColor(Color.DARK_GRAY);
+            g2img.drawPolygon(poly);
+        }
+        
+        g2.drawImage(img, 0, 0, null);
+        
+        // Display controls info
+        g2.setColor(Color.WHITE);
+        g2.drawString("Use sliders to rotate, mouse wheel to zoom", 10, 20);
+        g2.drawString("Heading: " + heading + "°, Pitch: " + pitch + "°, Zoom: " + String.format("%.1f", scale) + "x", 10, 40); 
+    }
+    
+    private Point projectVertex(Vector3D v, int centerX, int centerY, 
+                               double cosHeading, double sinHeading,
+                               double cosPitch, double sinPitch) {
+        // Apply rotation around Y-axis (heading)
+        double x = v.x * cosHeading - v.z * sinHeading;
+        double y = v.y;
+        double z = v.x * sinHeading + v.z * cosHeading;
+        
+        // Apply rotation around X-axis (pitch)
+        double y2 = y * cosPitch - z * sinPitch;
+        double z2 = y * sinPitch + z * cosPitch;
+        
+        // Apply scale
+        x *= scale * 100;
+        y2 *= scale * 100;
+        z2 *= scale * 100;
+        
+        // Apply perspective projection
+        double distance = 5;
+        double perspective = distance / (distance + z2 + 10);
+        
+        int screenX = centerX + (int)(x * perspective);
+        int screenY = centerY - (int)(y2 * perspective); // Y is flipped in screen coordinates
+        
+        return new Point(screenX, screenY);
+    }
+           
+
+}
+
 // Vector3D class for 3D vectors
 class Vector3D {
     public double x, y, z;
