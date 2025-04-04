@@ -95,5 +95,84 @@ class Model {
     public ArrayList<Triangle> triangles = new ArrayList<>();
 }
 
-
-
+class ModelLoader {
+    public Model loadModel(String filename) throws IOException {
+        Model model = new Model();
+        
+        BufferedReader reader = new BufferedReader(new FileReader(filename));
+        String line;
+        
+        // Calculate model center and size for normalization
+        double minX = Double.MAX_VALUE, maxX = Double.MIN_VALUE;
+        double minY = Double.MAX_VALUE, maxY = Double.MIN_VALUE;
+        double minZ = Double.MAX_VALUE, maxZ = Double.MIN_VALUE;
+        
+        ArrayList<Vector3D> tempVertices = new ArrayList<>();
+        
+        // First pass: read vertices to calculate bounding box
+        while ((line = reader.readLine()) != null) {
+            if (line.startsWith("v ")) {
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 4) {
+                    double x = Double.parseDouble(parts[1]);
+                    double y = Double.parseDouble(parts[2]);
+                    double z = Double.parseDouble(parts[3]);
+                    
+                    tempVertices.add(new Vector3D(x, y, z));
+                    
+                    minX = Math.min(minX, x);
+                    maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y);
+                    minZ = Math.min(minZ, z);
+                    maxZ = Math.max(maxZ, z);
+                }
+            }
+        }
+        
+        // Calculate center and scale
+        double centerX = (minX + maxX) / 2;
+        double centerY = (minY + maxY) / 2;
+        double centerZ = (minZ + maxZ) / 2;
+        
+        double maxDim = Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ));
+        double scale = 2.0 / maxDim; // Normalize to fit in a 2x2x2 cube
+        
+        // Add normalized vertices
+        for (Vector3D v : tempVertices) {
+            model.vertices.add(new Vector3D(
+                (v.x - centerX) * scale,
+                (v.y - centerY) * scale,
+                (v.z - centerZ) * scale
+            ));
+        }
+        
+        // Second pass: read faces
+        reader.close();
+        reader = new BufferedReader(new FileReader(filename));
+        
+        while ((line = reader.readLine()) != null) {
+            if (line.startsWith("f ")) {
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 4) {
+                    // Parse face indices (OBJ format uses 1-based indexing)
+                    int v1 = Integer.parseInt(parts[1].split("/")[0]) - 1;
+                    int v2 = Integer.parseInt(parts[2].split("/")[0]) - 1;
+                    int v3 = Integer.parseInt(parts[3].split("/")[0]) - 1;
+                    
+                    model.triangles.add(new Triangle(v1, v2, v3));
+                    
+                    // If the face has more than 3 vertices, triangulate it
+                    for (int i = 4; i < parts.length; i++) {
+                        int v = Integer.parseInt(parts[i].split("/")[0]) - 1;
+                        model.triangles.add(new Triangle(v1, v3, v));
+                        v3 = v;
+                    }
+                }
+            }
+        }
+        
+        reader.close();
+        return model;
+    }
+}
