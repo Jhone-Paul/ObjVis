@@ -1,6 +1,9 @@
 import javax.swing.*;
 import java.awt.*;
+import java.io.*;
 import java.util.*;
+import javax.swing.event.*;
+import java.awt.image.BufferedImage;
 
 public class DemoViewer {
   public static void main(String[] args) {
@@ -38,7 +41,6 @@ public class DemoViewer {
       frame.setVisible(true);
   }
 }
-
 // Vector3D class for 3D vectors
 class Vector3D {
     public double x, y, z;
